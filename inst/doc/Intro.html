@@ -360,7 +360,7 @@ calculation accuracy and speed of these two approaches are compared.</p>
 <div id="model" class="section level2">
 <h2>Model</h2>
 <p>Based on the previous researches on mixture model, Fraley and Raftery
-(2002) outline a general methodology for model-based clustering that
+[1] outline a general methodology for model-based clustering that
 provides a principled statistical approach to cluster analysis. We
 implement the EM iteration for Gaussian mixture models in it.</p>
 <p>Given data <span class="math inline">\(\mathbf{X}\)</span> with
@@ -697,9 +697,9 @@ P(\mu=\mu_3)=0.5\)</span> and <span class="math inline">\(\Sigma=1\)</span>.</p>
 <h1>The concave pairwise fusion approach</h1>
 <div id="model-1" class="section level2">
 <h2>Model</h2>
-<p>Ma and Huang (2017) proposed a concave pairwise fusion penalized
-least squares approach to subgroup analysis to deal with this problem.
-One of the models considered in this article is that <span class="math display">\[y_i=\mu_i+\mathbf{x}_i^T\mathbf{\beta}+\epsilon_i,\,
+<p>Ma and Huang [2] proposed a concave pairwise fusion penalized least
+squares approach to subgroup analysis to deal with this problem. One of
+the models considered in this article is that <span class="math display">\[y_i=\mu_i+\mathbf{x}_i^T\mathbf{\beta}+\epsilon_i,\,
 i=1,\dots,n,\]</span> i.e. <span class="math display">\[\mathbf{y}=\begin{pmatrix}y_1\\y_2\\\vdots\\y_n\end{pmatrix}=\mathbf{\mu}+\mathbf{X}\beta+\epsilon=\begin{pmatrix}\mu_1\\\mu_2\\\vdots\\\mu_n\end{pmatrix}+\begin{pmatrix}\mathbf{x}_1^T\\\mathbf{x}_2^T\\\vdots\\\mathbf{x}_n^T\end{pmatrix}\beta+\begin{pmatrix}\epsilon_1\\\epsilon_2\\\vdots\\\epsilon_n\end{pmatrix}=\begin{pmatrix}\mu_1\\\mu_2\\\vdots\\\mu_n\end{pmatrix}+\begin{pmatrix}x_{11}\
 x_{12}\cdots x_{1p}\\x_{21}\ x_{22}\cdots x_{2p}\\\vdots\\x_{n1}\
 x_{n2}\cdots
@@ -1113,6 +1113,16 @@ fusion penalty without knowledge of an a priori classification or a
 natural basis for separating a sample into subsets.</p>
 <div class="sourceCode" id="cb41"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb41-1"><a href="#cb41-1" tabindex="-1"></a><span class="fu">detach</span>(package<span class="sc">:</span>Rcpp)</span>
 <span id="cb41-2"><a href="#cb41-2" tabindex="-1"></a><span class="fu">rm</span>(<span class="at">list =</span> <span class="fu">ls</span>())</span></code></pre></div>
+</div>
+<div id="reference" class="section level1">
+<h1>Reference</h1>
+<p>[1] Chris Fraley and Adrian E Raftery (2002) Model-Based Clustering,
+Discriminant Analysis, and Density Estimation, Journal of the American
+Statistical Association, 97:458, 611-631, DOI:
+10.1198/016214502760047131.</p>
+<p>[2] Shujie Ma and Jian Huang (2017) A Concave Pairwise Fusion
+Approach to Subgroup Analysis, Journal of the American Statistical
+Association, 112:517, 410-423, DOI: 10.1080/01621459.2016.1148039.</p>
 </div>
 
 

@@ -16,7 +16,7 @@ In data analysis we sometimes need to correctly identify clusters from a heterog
 
 ## Model
 
-Based on the previous researches on mixture model, Fraley and Raftery (2002) outline a general methodology for model-based clustering that provides a principled statistical approach to cluster analysis. We implement the EM iteration for Gaussian mixture models in it.
+Based on the previous researches on mixture model, Fraley and Raftery [1] outline a general methodology for model-based clustering that provides a principled statistical approach to cluster analysis. We implement the EM iteration for Gaussian mixture models in it.
 
 Given data $\mathbf{X}$ with independent multivariate observations $\mathbf{x}_1,\dots,\mathbf{x}_n\in\mathbb{R}^p$, the likelihood for a
 mixture model with $K$ components is
@@ -277,7 +277,7 @@ mixmodel_Rcpp(X, K, 1e5, initial_tau, initial_mu, initial_sigma)
 
 ## Model
 
-Ma and Huang (2017) proposed a concave pairwise fusion penalized least squares approach to subgroup analysis to deal with this problem. One of the models considered in this article is that
+Ma and Huang [2] proposed a concave pairwise fusion penalized least squares approach to subgroup analysis to deal with this problem. One of the models considered in this article is that
 $$y_i=\mu_i+\mathbf{x}_i^T\mathbf{\beta}+\epsilon_i,\, i=1,\dots,n,$$
 i.e.
 $$\mathbf{y}=\begin{pmatrix}y_1\\y_2\\\vdots\\y_n\end{pmatrix}=\mathbf{\mu}+\mathbf{X}\beta+\epsilon=\begin{pmatrix}\mu_1\\\mu_2\\\vdots\\\mu_n\end{pmatrix}+\begin{pmatrix}\mathbf{x}_1^T\\\mathbf{x}_2^T\\\vdots\\\mathbf{x}_n^T\end{pmatrix}\beta+\begin{pmatrix}\epsilon_1\\\epsilon_2\\\vdots\\\epsilon_n\end{pmatrix}=\begin{pmatrix}\mu_1\\\mu_2\\\vdots\\\mu_n\end{pmatrix}+\begin{pmatrix}x_{11}\ x_{12}\cdots x_{1p}\\x_{21}\ x_{22}\cdots x_{2p}\\\vdots\\x_{n1}\ x_{n2}\cdots x_{np}\end{pmatrix}\begin{pmatrix}\beta_1\\\beta_2\\\vdots\\\beta_p\end{pmatrix}+\begin{pmatrix}\epsilon_1\\\epsilon_2\\\vdots\\\epsilon_n\end{pmatrix}.$$
@@ -591,4 +591,11 @@ But the most important difference between these two approaches is the scope of a
 detach(package:Rcpp)
 rm(list = ls())
 ```
+
+# Reference
+
+[1] Chris Fraley and Adrian E Raftery (2002) Model-Based Clustering, Discriminant Analysis, and Density Estimation, Journal of the American Statistical Association, 97:458, 611-631, DOI: 10.1198/016214502760047131.
+
+[2] Shujie Ma and Jian Huang (2017) A Concave Pairwise Fusion Approach to Subgroup Analysis, Journal of the American Statistical Association, 112:517, 410-423, DOI: 10.1080/01621459.2016.1148039.
+
 

@@ -3581,9 +3581,9 @@ variables X and Y are close to the theoretical distributions.</p>
 <pre><code>## Warning: package &#39;microbenchmark&#39; was built under R version 4.3.2</code></pre>
 <div class="sourceCode" id="cb237"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb237-1"><a href="#cb237-1" tabindex="-1"></a>compare.time <span class="ot">&lt;-</span> <span class="fu">microbenchmark</span>(<span class="at">R.function =</span> <span class="fu">mcmc.Gibbs.R</span>(a, b, n, initial, N), <span class="at">Rcpp.function =</span> <span class="fu">mcmc_Gibbs_Rcpp</span>(a, b, n, initial, N))</span>
 <span id="cb237-2"><a href="#cb237-2" tabindex="-1"></a><span class="fu">summary</span>(compare.time)[,<span class="fu">c</span>(<span class="dv">1</span>,<span class="dv">3</span>,<span class="dv">5</span>,<span class="dv">6</span>)]</span></code></pre></div>
-<pre><code>##            expr       lq   median       uq
-## 1    R.function 12.88815 16.72205 19.73065
-## 2 Rcpp.function  1.40510  1.52015  1.60725</code></pre>
+<pre><code>##            expr       lq  median       uq
+## 1    R.function 16.55255 20.9072 24.75035
+## 2 Rcpp.function  1.82205  1.8657  2.06725</code></pre>
 <div class="sourceCode" id="cb239"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb239-1"><a href="#cb239-1" tabindex="-1"></a><span class="fu">detach</span>(package<span class="sc">:</span>microbenchmark)</span>
 <span id="cb239-2"><a href="#cb239-2" tabindex="-1"></a><span class="fu">rm</span>(<span class="at">list =</span> <span class="fu">ls</span>())</span></code></pre></div>
 <p>From the comparison above, we find that the computation speed of Rcpp
