@@ -1,0 +1,594 @@
+---
+title: "Introduction to SA22204174"
+author: "Jinyiren Ren"
+date: "2022-12-13"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Introduction to SA22204174}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+In data analysis we sometimes need to correctly identify clusters from a heterogeneous population, which is the problem named subgroup analysis. A popular method for analyzing data from a heterogeneous population is to view data as coming from a mixture of subgroups with their own sets of parameter values and then apply finite mixture model analysis. In this package, two approaches are implemented: the mixture model approach and the concave pairwise fusion approach, and the calculation accuracy and speed of these two approaches are compared.
+
+# Two approaches for subgroup analysis
+
+# The mixture model approach
+
+## Model
+
+Based on the previous researches on mixture model, Fraley and Raftery (2002) outline a general methodology for model-based clustering that provides a principled statistical approach to cluster analysis. We implement the EM iteration for Gaussian mixture models in it.
+
+Given data $\mathbf{X}$ with independent multivariate observations $\mathbf{x}_1,\dots,\mathbf{x}_n\in\mathbb{R}^p$, the likelihood for a
+mixture model with $K$ components is
+$$L_{mix}(\theta_1,\dots,\theta_K;\tau_1,\dots,\tau_K|\mathbf{X})=\prod_{i=1}^n\sum_{k=1}^K\tau_kf_k(\mathbf{x}_i|\mathbf{\theta}_k)$$
+where $f_k$ and $\theta_k$ are the density and parameters, respectively, of the $k$th component in the mixture, and $\tau_k$ is the probability that an observation belongs to the $k$th component ($\tau_k\geq0;\sum_{k=1}^K=1$). 
+
+Most commonly, $f_k$ is the multivariate normal (Gaussian) density $\phi_k$, parametrized by its mean $\mu_k$ and covariance matrix $\Sigma_k$:
+$$\phi_k(\mathbf{x}_i|\theta_k)=\phi_k(\mathbf{x}_i|\mu_k,\Sigma_k)=\frac{\exp\left\{-\frac{1}{2}(\mathbf{x}_i-\mu_k)^T\Sigma_k^{-1}(\mathbf{x}_i-\mu_k)\right\}}{\sqrt{\det(2\pi\Sigma_k)}}.$$
+
+## Method
+
+In EM for mixture models, the "complete data" are considered to be $\mathbf{y}_i=(\mathbf{x}_i,\mathbf{z}_i)$, where $\mathbf{z}_i=(z_{i1},\dots,z_{iK})$ is the unobserved portion of the data, with
+$$z_{ik}=\left\{\begin{array}{ll}
+1,\quad \text{if}\ \mathbf{x}_i\ \text{belongs to group}\ k,\\
+0,\quad \text{otherwise}.
+\end{array}\right.$$
+Assuming that each $\mathbf{z}_i$ is independent and identically distrubuted according to a multinomial distrubution of one draw from $K$ probability $\tau_1,\dots,\tau_K$, and that the density of an observation $\mathbf{x}_i$ given $\mathbf{z}_i$ is given by $\prod_{k=1}^Kf_k(\mathbf{x}_i|\theta_k)^{z_{ik}}$, the resulting complete data logarithmic likelihood is
+$$l(\theta_k,\tau_k,\Sigma_k,k=1,\dots,K|\mathbf{Y})=\sum_{i=1}^n\sum_{k=1}^Kz_{ik}\log[\tau_kf_k(\mathbf{x}_i|\theta_k)].$$
+The idea is to find $\hat\theta_k,\hat\tau_k,\hat\Sigma_k,k=1,\dots,K$ to maximize the logarithmic likelihood. And then maximum-likelihood classification of observation $i$ is $\mathrm{argmax}_{k\in\{1,\dots,K\}}(z_{ik})$ so that $(1-\max_k(z_{ik}))$ is a measure of the uncertainty in the classification.
+
+## Algorithm
+
+The EM algorithm is as follows.
+
+1. Initiate $\theta=(\theta_k,\tau_k,\Sigma_k,k=1,\dots,K)$ with $\hat\theta=(\hat\mu_k,\hat\tau_k,\hat\Sigma_k,k=1,\dots,K)$.
+
+2. E-step: the conditional expectation $\hat{\mathbf{Z}}$ of $\mathbf{Z}$ is
+$$\hat{z}_{ik}=\frac{\hat{\tau}_kf_k(\mathbf{x}_i|\hat{\theta}_k)}{\sum_{j=1}^K\hat{\tau}_jf_j(\mathbf{x}_i|\hat{\theta}_j)}.$$
+
+3. M-step: maximize
+$$l(\theta_k,\tau_k,\Sigma_k,k=1,\dots,K|\mathbf{Y})=\sum_{i=1}^n\sum_{k=1}^Kz_{ik}\log[\tau_kf_k(\mathbf{x}_i|\theta_k)]=\sum_{i=1}^n\sum_{k=1}^Kz_{ik}\left(\log\tau_k-\frac{p}{2}\log(2\pi)-\frac{1}{2}\log(\det(\Sigma_k))-\frac{1}{2}(\mathbf{x}_i-\mu_k)^T\Sigma_k^{-1}(\mathbf{x}_i-\mu_k)\right).$$
+w.r.t. $\theta=(\mu,\tau,\Sigma)$. The resulting maximizers are
+$${n}_k=\sum_{i=1}^n\hat{z}_{ik},\quad \hat\tau_k=\frac{\hat n_k}{n},\quad \hat\mu_k=\frac{\sum_{i=1}^n\hat{z}_{ik}\mathbf{x}_i}{n_k},\quad \hat\Sigma_k=\frac{W_k}{n_k}=\frac{\sum_{i=1}^n\hat{z}_{ik}(\mathbf{x}_i-\hat\mu_k)(\mathbf{x}_i-\hat\mu_k)^T}{n_k}.$$
+
+4. Repeat steps 2 and 3 until the sequence $\theta$ convergence.
+
+## R Function
+
+There is a R function to implement the mixture model approach.
+
+- Input:
+  - X: the random samples generated from a Gaussian mixture model, data structure: $n\times p$-dimensional matrix.
+  - K: the number of mixture components in the population, data structure: int.
+  - times: the upper bound on the number of iterations, data structure: int.
+  - initial.tau: initial value of tau, data structure: $K$-dimensional vector.
+  - initial.mu: initial value of mu, data structure: $p\times K$-dimensional matrix, or $K$-dimensional vector (when $p$=1).
+  - initial.sigma: initial value, data structure: $p\times p\times K$-dimensional array, or $K$-dimensional vector (when $p$=1).
+  
+- Output: a list including
+  - iterations: the number of iterations, data structure: int.
+  - tau: the estimate of the proportion of each cluster, data structure: $K$-dimensional vector.
+  - mu: the estimate of $\mu$ in each cluster, data structure: $p\times K$-dimensional matrix.
+  - sigma: the estimate of $\Sigma$ in each cluster, data structure: $p\times p\times K$-dimensional array.
+
+```{r}
+mixmodel_R <- function(X, K, times = 1e4, initial.tau, initial.mu, initial.sigma){
+  #X: the random samples generated from a Gaussian mixture model, data structure: n*p-dimensional matrix, n-dimensional vector(p=1)
+  #K: the number of mixture components in the population, data structure: int
+  #times: the upper bound on the number of iterations, data structure: int
+  #initial.tau: initial value of tau, data structure: K-dimensional vector
+  #initial.mu: initial value of mu, data structure: p*K-dimensional matrix, K-dimensional vector(p=1)
+  #initial.sigma: initial value of sigma, data structure: p*p*K-dimensional array, K-dimensional vector(p=1)
+  n <- nrow(X); p <- ncol(X)#n: sample size, p: the dimension of random vectors
+  tau <- matrix(0, nrow = K, ncol = times+1)#the chains from iteration
+  mu <- array(0, dim = c(p, K, times+1))
+  sigma <- array(0, dim = c(p, p, K, times+1))
+  z <- matrix(0, nrow = n, ncol = K)
+  rate <- 1e-8 #Convergence is checked when the change of elements in the sequence is small enough
+  
+  #initialization
+  tau[,1] <- initial.tau
+  mu[,,1] <- initial.mu
+  sigma[,,,1] <- initial.sigma
+  
+  #EM iteration
+  for(i in 1:times){
+    for(k in 1:K){
+#      zk <- apply(X, 1, function(x) exp(-(x-mu[,k,i])%*%solve(sigma[,,k,i])%*%(x-mu[,k,i])/2)/sqrt(2*pi*det(sigma[,,k,i])) )
+      if(p > 1){
+      zk <- apply(X, 1, function(x) mvtnorm::dmvnorm(x, mean = mu[,k,i], sigma = sigma[,,k,i]))
+      }else{
+      zk <- dnorm(X, mean = mu[,k,i], sd = sqrt(sigma[,,k,i]))
+      }#n-dimension
+      z[,k] <- tau[k,i]*zk#n-dimension
+    }
+    z_column <- apply(z, 1, sum)#n-dimension
+    z <- z/z_column
+    nhat <- apply(z, 2, sum)#K-dimension
+    tau[,i+1] <- nhat/n
+    for(k in 1:K){
+      mu[,k,i+1] <- apply(z[,k]*X, 2, sum)/nhat[k]#p-dimension
+      sigma[,,k,i+1] <- t(X-matrix(1,n,1)%*%mu[,k,i+1])%*%diag(z[,k])%*%(X-matrix(1,n,1)%*%mu[,k,i+1])/nhat[k]#(p*n)*(n*n)*(n*p)=p*p-dimension
+    }
+    #cat("step=", i, "tau=", tau[,i+1], "mu=", mu[,,i+1], "sigma=", sigma[,,,i+1], '\n')
+    if (max( sum(abs(tau[,i+1] - tau[,i]))/sum(abs(tau[,i])), sum(abs(mu[,,i+1]-mu[,,i]))/sum(abs(mu[,,i])), sum(abs(sigma[,,,i+1]-sigma[,,,i]))/sum(abs(sigma[,,,i])) ) < rate){
+      #cat("The sequence converges after", i, "iterations.", '\n')
+      break
+    }
+  }
+  return(list(iterations = i, tau = tau[,i+1], mu = mu[,,i+1], sigma = sigma[,,,i+1]))
+}
+```
+
+## Example for R function
+
+### Example 1.
+$n=500,p=2,K=3$, $\mu_1=(-2,-1),\mu_2=(0,4),\mu_3=(3,1)$, $P(\mu=\mu_1)=1/3, P(\mu=\mu_2)=1/3, P(\mu=\mu_3)=1/3$ and $\Sigma$ satisfies that $\Sigma_{ii}=1, \Sigma_{ij}=0.3, i\neq j\in\{1,2\}$.
+
+```{r}
+#parameters of the samples
+n <- 500; p <- 2; K <- 3
+mu <- matrix(c(-2,-1,0,4,3,1), nrow = p, ncol = K)
+sigma <- matrix(0.3, nrow = p, ncol = p) + diag(0.7, p)
+
+#generate the random samples
+X <- matrix(0, nrow = n, ncol = p)
+set.seed(1)
+select <- sample(1:3, size = n, replace = TRUE, prob = c(1/3,1/3,1/3))
+X[select==1,] <- mvtnorm::rmvnorm(sum(select==1), mean = mu[,1], sigma = sigma)
+X[select==2,] <- mvtnorm::rmvnorm(sum(select==2), mean = mu[,2], sigma = sigma)
+X[select==3,] <- mvtnorm::rmvnorm(sum(select==3), mean = mu[,3], sigma = sigma)
+```
+
+```{r}
+#initialization
+initial.tau <- rep(1/K, K)
+initial.mu <- matrix(c(-2,-2,0,0,2,2), nrow = p, ncol = K)
+initial.sigma <- array(rep(cov(X), K), dim = c(p,p,K))
+#cluster analysis
+mixmodel_R(X, K, times = 500, initial.tau, initial.mu, initial.sigma)
+```
+
+### Example 2.
+
+$n=300,p=1,K=3$, $\mu_1=-2,\mu_2=0,\mu_3=3$, $P(\mu=\mu_1)=0.3, P(\mu=\mu_2)=0.2, P(\mu=\mu_3)=0.5$ and $\Sigma=1$.
+
+```{r}
+#parameters of the samples
+n <- 300; p <- 1; K <- 3
+mu <- c(-2, 0, 3)
+sigma <- 1
+
+#generate the random samples
+X <- numeric(n)
+set.seed(1)
+select <- sample(1:3, size = n, replace = TRUE, prob = c(0.3,0.2,0.5))
+X[select==1] <- rnorm(sum(select==1), mean = mu[1], sd = sqrt(sigma))
+X[select==2] <- rnorm(sum(select==2), mean = mu[2], sd = sqrt(sigma))
+X[select==3] <- rnorm(sum(select==3), mean = mu[3], sd = sqrt(sigma))
+```
+
+```{r}
+#initialization
+initial.tau <- rep(1/K, K)
+initial.mu <- matrix(c(-1,0,1), nrow = p, ncol = K)
+initial.sigma <- array(rep(var(X), K), dim = c(p,p,K))
+#cluster analysis
+mixmodel_R(matrix(X, nrow = n, ncol = p), K, 1e4, initial.tau, initial.mu, initial.sigma)
+```
+
+## Rcpp function
+
+There is a R function to implement the mixture model approach when $p=1$.
+
+- Input:
+  - X: the random samples generated from a Gaussian mixture model, data structure: $n$-dimensional vector.
+  - K: the number of mixture components in the population, data structure: int.
+  - times: the upper bound on the number of iterations, data structure: int.
+  - initial_tau: initial value of tau, data structure: $K$-dimensional vector.
+  - initial_mu: initial value of mu, data structure: $K$-dimensional vector ($p$=1).
+  - initial_sigma: initial value of sigma, data structure: $K$-dimensional vector ($p$=1).
+  
+- Output: a list including
+  - iterations: the number of iterations, data structure: int.
+  - tau: the estimate of the proportion of each cluster, data structure: $K$-dimensional vector.
+  - mu: the estimate of $\mu$ in each cluster, data structure: $K$-dimensional vector.
+  - sigma: the estimate of $\Sigma$ in each cluster, data structure: $K$-dimensional vector.
+
+```{c,eval=FALSE}
+# include <Rcpp.h>
+using namespace Rcpp;
+
+// [[Rcpp::export]]
+List mixmodel_Rcpp(NumericVector X, int K, int times, NumericVector initial_tau, NumericVector initial_mu, NumericVector initial_sigma){
+  //X: the random samples generated from a Gaussian mixture model, data structure: matrix, nrow = sample size, ncol = the dimension of random vectors
+  //K: the number of mixture components in the population, data structure: int
+  //times: the upper bound on the number of iterations, data structure: int
+  int n = X.size(); //n: sample size, p: the dimension of random vectors
+  NumericMatrix tau(K, times+1), mu(K, times+1), sigma(K, times+1);//the chains from iteration
+  NumericMatrix z(n, K); NumericVector zk(n), z_column(n), nhat(K);
+  double rate = 1e-8; //Convergence is checked when the change of elements in the sequence is small enough
+  
+  //initialization
+  tau.column(0) = initial_tau;
+  mu.column(0) = initial_mu;
+  sigma.column(0) = initial_sigma;
+ 
+  //EM iteration
+  int t;//counternumber
+  for(int i=0; i<times; i++){
+    for(int k=0; k<K; k++){
+      zk = Rcpp::dnorm(X, mu(k,i), sqrt(sigma(k,i)));//n-dimension
+      z.column(k) = tau(k,i)*zk;//n-dimension
+    }
+    for(int j=0; j<n; j++){
+      z_column[j] = sum(z.row(j));
+    }
+    for(int k=0; k<K; k++){
+      z.column(k) = z.column(k)/z_column;//n-dimension
+      nhat[k] = sum(z.column(k));
+      tau(k, i+1) = nhat[k]/n;
+      mu(k, i+1) = sum(z.column(k)*X)/nhat[k];//p-dimension
+      sigma(k, i+1) = sum((X-mu(k, i+1))*z.column(k)*(X-mu(k, i+1)))/nhat[k];//(p*n)*(n*n)*(n*p)=p*p-dimension
+    }
+    if( ((sum(abs(tau(_,i+1)-tau(_,i)))/sum(abs(tau(_,i))))<rate) & ((sum(abs(mu(_,i+1)-mu(_,i)))/sum(abs(mu(_,i))))<rate) & ((sum(abs(sigma(_,i+1)-sigma(_,i)))/sum(abs(sigma(_,i))))<rate) ){
+      //print( List::create(Named("The sequence converges after the number of iterations = ")=i+1));
+      t = i+1;
+      break;
+    }
+  }
+  return(List::create(Named("iterations") = t, Named("tau") = tau(_,t), Named("mu") = mu(_,t), Named("sigma") = sigma(_,t)));
+}
+
+```
+
+## Example for Rcpp function
+
+$n=300,p=1,K=3$, $\mu_1=-2,\mu_2=0,\mu_3=3$, $P(\mu=\mu_1)=0.3, P(\mu=\mu_2)=0.2, P(\mu=\mu_3)=0.5$ and $\Sigma=1$.
+
+```{r}
+#parameters of the samples
+n <- 300; p <- 1; K <- 3
+mu <- c(-2, 0, 3)
+sigma <- 1
+
+#generate the random samples
+X <- numeric(n)
+set.seed(1)
+select <- sample(1:3, size = n, replace = TRUE, prob = c(0.3,0.2,0.5))
+X[select==1] <- rnorm(sum(select==1), mean = mu[1], sd = sqrt(sigma))
+X[select==2] <- rnorm(sum(select==2), mean = mu[2], sd = sqrt(sigma))
+X[select==3] <- rnorm(sum(select==3), mean = mu[3], sd = sqrt(sigma))
+```
+
+```{r}
+#initialization
+initial_tau <- rep(1/K, K)
+initial_mu <- c(-1, 0, 1)
+initial_sigma <- rep(var(X),K)
+#cluster analysis
+library(Rcpp)
+sourceCpp('../src/SA22204174Rcpp.cpp')
+mixmodel_Rcpp(X, K, 1e5, initial_tau, initial_mu, initial_sigma)
+```
+
+
+# The concave pairwise fusion approach
+
+## Model
+
+Ma and Huang (2017) proposed a concave pairwise fusion penalized least squares approach to subgroup analysis to deal with this problem. One of the models considered in this article is that
+$$y_i=\mu_i+\mathbf{x}_i^T\mathbf{\beta}+\epsilon_i,\, i=1,\dots,n,$$
+i.e.
+$$\mathbf{y}=\begin{pmatrix}y_1\\y_2\\\vdots\\y_n\end{pmatrix}=\mathbf{\mu}+\mathbf{X}\beta+\epsilon=\begin{pmatrix}\mu_1\\\mu_2\\\vdots\\\mu_n\end{pmatrix}+\begin{pmatrix}\mathbf{x}_1^T\\\mathbf{x}_2^T\\\vdots\\\mathbf{x}_n^T\end{pmatrix}\beta+\begin{pmatrix}\epsilon_1\\\epsilon_2\\\vdots\\\epsilon_n\end{pmatrix}=\begin{pmatrix}\mu_1\\\mu_2\\\vdots\\\mu_n\end{pmatrix}+\begin{pmatrix}x_{11}\ x_{12}\cdots x_{1p}\\x_{21}\ x_{22}\cdots x_{2p}\\\vdots\\x_{n1}\ x_{n2}\cdots x_{np}\end{pmatrix}\begin{pmatrix}\beta_1\\\beta_2\\\vdots\\\beta_p\end{pmatrix}+\begin{pmatrix}\epsilon_1\\\epsilon_2\\\vdots\\\epsilon_n\end{pmatrix}.$$
+It is also assumed that $\mathbf{y}=(y_1,\dots,y_n)^T$ are from $K\geq1$ different groups
+and the data from the same group have the same intercept. In other words, let $\mathcal{G}=(\mathcal{G}_1,\dots,\mathcal{G}_K)$ be a partition of $\{1,\dots,n\}$. We have $\mu_i=\alpha_k$ for all $i\in\mathcal{G}_k$, where $\alpha_k$ is the common value for the $\mu_i$'s from group $\mathcal{G}_k$. In practice, the number of groups $K$ is unknown. However, it is usually reasonable to assume that K is much smaller than n. The goal of this paper is to estimate $K$ and identify the subgroups of outcomes.
+
+## Method
+
+The idea is to minimize the objective function
+$$Q_n(\mathbf{\mu},\mathbf{\beta};\lambda)=\frac{1}{2}\sum_{i=1}^n(y_i-\mu_i-\mathbf{x}_i^T\mathbf{\beta})^2+\sum_{1\leq i<j\leq n}p(|\mu_i-\mu_j|,\lambda),$$
+where $p(\cdot,\lambda)$ is a concave penalty function with a tuning parameter $\lambda\geq 0$.
+
+For a given $\lambda>0$, define
+$$(\hat\mu(\lambda),\hat\beta(\lambda))=\mathrm{argmin}_{\mu,\beta}Q_n(\mu,\beta;\lambda).$$
+The penalty shrinks some of the pairs $\mu_j-\mu_k$ to zero. Based on this, we can partition the sample into subgroups. Specifically, let $\hat\lambda$ be the value of the tuning parameter selected based on a data-driven procedure such as the BIC. For simplicity, write $(\hat\mu,\hat\beta)=(\hat\mu(\hat\lambda),\hat\beta(\hat\lambda))$. Let $\{\hat\alpha_1,\dots,\hat\alpha_{\hat K}\}$ be the distinct values of $\hat\mu$. Let $\hat{\mathcal{G}}_{k}=\{i:\hat\mu_i=\hat\alpha_k,1\leq i\leq n\},1\leq k\leq\hat K$. Then $\{\hat{\mathcal{G}}_1,\dots,\hat{\mathcal{G}}_{\hat K}\}$ constitutes a partition of $\{1,\dots,n\}$.
+
+Three kinds of penalty function are used.
+
+1. The $L_1$ penalty
+$$p_{\gamma}(t,\lambda)=p(t,\lambda)=\lambda t.$$
+2. some concave penalty: SCAD
+$$p_{\gamma}(t,\lambda)=\lambda\int_{0}^t(1-x/(\gamma\lambda))_+\mathrm{d}x,\, \gamma>1,$$
+
+3. some concave penalty: MCP
+$$p_{\gamma}(t,\lambda)=\lambda\int_{0}^t\min \left\{1,\frac{(\gamma-x/\lambda)_+}{\gamma-1}\right\},\, \gamma>2,$$
+where $\gamma$ is a parameter that controls the concavity of the penalty function.
+
+By the augmented Lagrangian method, the estimates of the parameters can be obtained by minimizing
+$$L(\mathbf{\mu},\mathbf{\beta},\mathbf{\eta},\mathbf{\upsilon})=S(\mathbf{\mu},\mathbf{\beta},\mathbf{\eta})+\sum_{i<j}\upsilon_{ij}(\mu_i-\mu_j-\eta_{ij})+\frac{\vartheta}{2}\sum_{i<j}(\mu_i-\mu_j-\eta_{ij})^2\\
+=\frac{1}{2}\sum_{i=1}^n(y_i-\mu_i-\mathbf{x}_i^T\mathbf{\beta})^2+\sum_{i<j}p_{\gamma}(|\eta_{ij}|,\lambda)+\sum_{i<j}\upsilon_{ij}(\mu_i-\mu_j-\eta_{ij})+\frac{\vartheta}{2}\sum_{i<j}(\mu_i-\mu_j-\eta_{ij})^2,$$
+where $\mathbf{\eta}=\{\eta_{ij}, i<j\}^T$, $\eta_{ij}=\mu_i-\mu_i, 1\leq i<j\leq n$, the dual variables $\mathbf{\upsilon}=\{\upsilon_{ij},i<j\}^T$ are Lagrange multipliers and $\vartheta$ is the penalty parameter.
+
+Given $(\mathbf{\mu},\mathbf{\beta},\mathbf{\upsilon})$, the minimization problem is the same as minimizing
+$$\frac{\vartheta}{2}(\delta_{ij}-\eta_{ij})^2+p_{\gamma}(|\eta_{ij}|,\lambda)$$
+w.r.t. $\eta_{ij}$, where $\delta_{ij}=\mu_i-\mu_j+\vartheta^{-1}\upsilon_{ij}$. The closed-form solution are as follows.
+
+1. $L_1$ penalty
+$$\hat{\eta}_{ij}=\mathrm{ST}(\delta_{ij},\lambda/\vartheta),$$
+where $\mathrm{ST}(t,\lambda)=\mathrm{sign}(t)(|t|-\lambda)_+$ is the soft thresholding rule.
+
+2. MCP penalty with $\gamma>1/\vartheta$
+$$\hat{\eta}_{ij}=\left\{\begin{array}{ll}
+\frac{\mathrm{ST}(\delta_{ij},\lambda/\vartheta)}{1-1/(\gamma\vartheta)}, & |\delta_{ij}|\leq\gamma\lambda, \\
+\delta_{ij}, & |\delta_{ij}|>\gamma\lambda.
+\end{array}\right.$$
+
+3. SCAD penalty with $\gamma>1/\vartheta+1$
+$$\hat{\eta}_{ij}=\left\{\begin{array}{ll}
+\mathrm{ST}(\delta_{ij},\lambda/\vartheta), & |\delta_{ij}|\leq\lambda+\lambda/\vartheta, \\
+\frac{\mathrm{ST}(\delta_{ij},\gamma\lambda/((\gamma-1)\vartheta))}{1-1/((\gamma-1)\vartheta)}, & |\delta_{ij}|\leq\gamma\lambda, \\
+\delta_{ij}, & |\delta_{ij}|>\gamma\lambda.
+\end{array}\right.$$
+
+## Algorithm
+
+Use ADMM method to iteratively update $\mathbf{\mu},\mathbf{\beta},\mathbf{\eta},\mathbf{\upsilon}$.
+
+1. Initial estimates: $\mathbf{\beta}^{(0)}$ from least squares regression by letting $\mu_i=\mu$ for all $i$, $\mathbf{\mu}^{(0)}=\mathbf{y}-\mathbf{X}\mathbf{\beta}^{(0)}, \eta_{ij}^{(0)}=\mu_i^{(0)}-\mu_j^{(0)},\mathbf{\upsilon}^{(0)}=\mathbf{0}$.
+
+2. At iteration $m + 1$, compute $(\mathbf{\mu}^{(m+1)},\mathbf{\beta}^{(m+1)},\mathbf{\eta}^{(m+1)},\mathbf{\upsilon}^{(m+1)})$ by the ADMM method.
+
+  2.1. Update $\mathbf{\mu},\mathbf{\beta}$:
+$$\mathbf{\mu}^{(m+1)}=(\vartheta\Delta^T\Delta+\mathbf{I}_n-\mathbf{Q}_x)^{-1}\cdot\{(\mathbf{I}_n-\mathbf{Q}_x)\mathbf{y}+\vartheta\Delta^T(\mathbf{\eta}^{(m)}-\vartheta^{-1}\mathbf{\upsilon}^{(m)})\},\\
+\mathbf{\beta}^{(m+1)}=(\mathbf{X}^T\mathbf{X})^{-1}\mathbf{X}^T(\mathbf{y}-\mathbf{\mu}^{(m+1)}),$$
+where $\Delta=\{e_i-e_j,i<j\}^T$ and $\mathbf{Q}_x=\mathbf{X}(\mathbf{X}^T\mathbf{X})^{-1}\mathbf{X}^T$.
+
+  2.2. update $\mathbf{\eta}$:
+$$\delta_{ij}^{(m+1)}=\mu_i^{(m+1)}-\mu_j^{(m+1)}+\vartheta^{-1}\upsilon_{ij}^{(m)},$$
+$\eta_{ij}^{(m+1)}$ is obtained by the formula given above.
+
+  2.3. update $\mathbf{\upsilon}$:
+$$\upsilon_{ij}^{(m+1)}=\upsilon_{ij}^{(m)}+\vartheta\{\mu_i^{(m+1)}-\mu_j^{(m+1)}-\eta_{ij}^{(m+1)}\}.$$
+
+3. Terminate the algorithm if the stopping rule is met at step $m + 1$. Then $(\mathbf{\mu}^{(m+1)},\mathbf{\beta}^{(m+1)},\mathbf{\eta}^{(m+1)},\mathbf{\upsilon}^{(m+1)})$ are our final estimates $(\hat{\mathbf{\mu}},\hat{\mathbf{\beta}},\hat{\mathbf{\eta}},\hat{\mathbf{\upsilon}})$.
+
+Otherwise, we go to Step 2.
+
+## Function
+
+We implement the the performance of the estimators with the ADMM algorithm by using penalty MCP, and for other penalties the functions are the same.
+
+- Input: 
+  - X: independent variables of linear regression model, data structure: $n\times p$-dimensional matrix.
+  - y: dependent variables of linear regression model, data structure: $n\times1$-dimensional matrix, or $n$-dimensiobal vector.
+  - times: the upper bound on the number of iterations, data structure: int.
+  - vartheta, gamma, lambda: parameters of the penalty function, data structure: numeric.
+  
+- Output: a list including
+  - iterations: the number of iterations, data structure: int.
+  - mu: The estimator $\hat\mu$, data structure: $n$-dimensional vector.
+  - beta: The estimator $\hat\beta$, data structure: $p\times1$-dimensional matrix.
+
+```{r}
+concavefusion <- function(X, y, times = 1e6, vartheta, gamma, lambda){
+  #X: independent variables of linear regression model, data structure: n*p-dimensional matrix, n-dimensional vector(p=1)
+  #y: dependent variables of linear regression model, data structure: n*1-dimensional matrix, n-dimensional vector
+  #times: the upper bound on the number of iterations, data structure: int
+  #vartheta, gamma, lambda: parameters of the penalty function, data structure: numeric
+  n <- nrow(X) #sample size
+  rate <- 1e-8 #Convergence is checked when the change of elements in the sequence is small enough
+
+  #the deterministic matrices that will be used in the iteration
+  deltaT <- matrix(0, nrow = n, ncol = n*(n-1)/2)
+  #deltaT[1,1:(n-1)] <- 1
+  #for(j in 2:n){deltaT[j,j-1] <- -1}
+  #for(i in 2:(n-1)){para_delta[i,(sum((n-i+1):(n-1))+1):(sum((n-i):(n-1)))] <- 1}
+  #for(j in 2:n){para_delta[j,j:n] <- -1}
+  for(i in 1:(n-1)){
+    for(j in 1:(n-i)){
+      deltaT[i,(2*n-i)*(i-1)/2+j] <- 1
+      deltaT[i+j,(2*n-i)*(i-1)/2+j] <- -1
+    }
+  }
+  deltaTdelta <- tcrossprod(deltaT)
+  Qx <- X %*% solve(crossprod(X)) %*%t(X)
+  para.mu <- solve(vartheta*deltaTdelta + diag(1, n) - Qx)
+  para.beta <- solve(crossprod(X))
+
+  #initialization
+  X1 <- cbind(1, X)
+  initial <- solve(crossprod(X1)) %*% (crossprod(X1, y))
+  mupast <- rep(initial[1,], n)
+  betapast <- initial[-1,]
+  deltanew <- etanew <- etapast <- upsilonnew <- upsilonpast <- matrix(0, nrow = n, ncol = n)
+
+  #iteration
+  for(t in 1:times){
+    #update mu
+    etapast.vector <- matrix(0, 1, 1)
+    upsilonpast.vector <- matrix(0, 1, 1)
+    for(i in 1:(n-1)){
+      for(j in (i+1):n){
+        etapast.vector <- rbind(etapast.vector, etapast[i,j])
+        upsilonpast.vector <- rbind(upsilonpast.vector, upsilonpast[i,j])
+      }
+    }
+    etapast.vector <- etapast.vector[-1,]
+    upsilonpast.vector <- upsilonpast.vector[-1,]
+
+    munew <- para.mu %*% ((diag(1, n)-Qx) %*% y + vartheta*deltaT %*% (etapast.vector-upsilonpast.vector/vartheta))
+
+    #update beta
+    betanew <- para.beta %*% crossprod(X, (y-munew))
+
+    #update eta
+    for(i in 1:n){
+      for(j in 1:n){
+        deltanew[i,j] <- munew[i] - munew[j] + upsilonpast[i,j]/vartheta
+        if(abs(deltanew[i,j]) <= gamma*lambda){
+          etanew[i,j] <- sign(deltanew[i,j])*max(abs(deltanew[i,j])-lambda/vartheta,0) / (1-1/gamma/vartheta)
+        }else{
+          etanew[i,j] <- deltanew[i,j]
+        }
+      }
+    }
+
+    #update upsilon
+    for(i in 1:n){
+      for(j in 1:n){
+        upsilonnew[i,j] <- upsilonpast[i,j] + vartheta*(munew[i]-munew[j]-etanew[i,j])
+      }
+    }
+
+    #Check for convergence
+    if (max(sum(abs(munew - mupast))/(sum(abs(mupast))+1e-4), sum(abs(betanew-betapast))/(sum(abs(betapast))+1e-4), sum(abs(etanew-etapast))/(sum(abs(etapast))+1e-4), sum(abs(upsilonnew-upsilonpast))/(sum(abs(upsilonpast))+1e-4)) < rate){
+      #cat("The sequence converges after", t, "iterations.", '\n')
+      break
+    }else{
+      mupast <- munew
+      betapast <- betanew
+      etapast <- etanew
+      upsilonpast <- upsilonnew
+    }
+  }
+  return(list(iterations = t, mu = munew, beta = betanew))
+}
+```
+
+
+## Example
+
+### Example 1.
+$n=50,p=2,K=3$, $\mu_1=-2,\mu_2=0,\mu_3=2$, $P(\mu=\mu_1)=1/3, P(\mu=\mu_2)=1/3, P(\mu=\mu_3)=1/3$ and $\Sigma$ satisfies that $\Sigma_{ii}=1, \Sigma_{ij}=0.3, i\neq j\in\{1,2\}$.
+
+we choose to fix the parameters of the penalty function that $\vartheta=1$, $\gamma=3$ and $\lambda=0.05$.
+
+```{r}
+#parameters of the samples
+n <- 50; p <- 2; K <- 3
+sigma <- matrix(0.3, nrow = p, ncol = p) + diag(0.7, p)
+mu <- c(-2,0,2)
+beta <- matrix(c(1,3), nrow = p, ncol = 1)
+
+#generate the samples
+set.seed(1)
+mu.sample <- sample(mu, size = n, replace = TRUE, prob = c(1/3,1/3,1/3))
+X <- mvtnorm::rmvnorm(n, mean = c(0,0), sigma = sigma)
+y <- mu.sample + X%*%beta + rnorm(n, mean = 0, sd =0.5)
+```
+
+```{r}
+#parameters to be input in the function
+vartheta <- 1; gamma <- 3; lambda <- 0.05; times <- 1e4
+#using the function to implement subgroup analysis
+result <- concavefusion(X, y, times, vartheta, gamma, lambda)
+#check whether the results accord with the theoretical value
+result$iterations; result$mu[mu.sample==mu[1]]; result$mu[mu.sample==mu[2]]; result$mu[mu.sample==mu[3]]; result$beta
+```
+
+### Example 2.
+
+$n=50,p=2,K=3$, $\mu_1=-2,\mu_2=0,\mu_3=2$, $P(\mu=\mu_1)=1/3, P(\mu=\mu_2)=1/3, P(\mu=\mu_3)=1/3$ and $\Sigma$ satisfies that $\Sigma_{ii}=1, \Sigma_{ij}=0.3, i\neq j\in\{1,2\}$.
+
+we choose to fix the parameters of the penalty function that $\vartheta=1$, $\gamma=3$ and $\lambda=0.05$.
+
+```{r}
+#parameters of the samples
+n <- 50; p <- 1; K <- 3
+sigma <- 1
+mu <- c(-2,0,3)
+beta <- 2
+
+#generate the samples
+set.seed(1)
+mu.sample <- sample(mu, size = n, replace = TRUE, prob = c(0.2,0.3,0.5))
+X <- rnorm(n, mean = 0, sd = sqrt(sigma))
+X <- matrix(X, nrow = n, ncol = 1)
+y <- mu.sample + X%*%beta + rnorm(n, mean = 0, sd =0.5)
+```
+
+```{r}
+#parameters to be input in the function
+vartheta <- 1; gamma <- 3; lambda <- 0.05; times <- 1e4
+#using the function to implement subgroup analysis
+result <- concavefusion(X, y, times, vartheta, gamma, lambda)
+#check whether the results accord with the theoretical value
+result$iterations; result$mu[mu.sample==mu[1]]; result$mu[mu.sample==mu[2]]; result$mu[mu.sample==mu[3]]; result$beta
+```
+
+# Comparison
+
+We compare the two approaches. In our regression setting, we need to apply the mixture model approach to $y_i-\mathbf{x}_i^T\beta$ for cluster analysis. One simple way is to obtain the estimate $\hat{\beta}$ of $\beta$ by the ordinary least squares (OLS) first, and then apply the mixture model approach to the observations $y_i-\mathbf{x}_i^T\hat\beta$.
+
+$n=50,p=2,K=3$, $\mu_1=-2,\mu_2=0,\mu_3=2$, $P(\mu=\mu_1)=1/3, P(\mu=\mu_2)=1/3, P(\mu=\mu_3)=1/3$ and $\Sigma$ satisfies that $\Sigma_{ii}=1, \Sigma_{ij}=0.3, i\neq j\in\{1,2\}$.
+
+we choose to fix the parameters of the penalty function that $\vartheta=1$, $\gamma=3$ and $\lambda=0.05$.
+
+```{r}
+#parameters of the samples
+n <- 30; p <- 1; K <- 3
+sigma <- 1
+mu <- c(-2,0,3)
+beta <- 2
+
+#generate the samples
+set.seed(1)
+mu.sample <- sample(mu, size = n, replace = TRUE, prob = c(0.2,0.3,0.5))
+X <- rnorm(n, mean = 0, sd = sqrt(sigma))
+X <- matrix(X, nrow = n, ncol = 1)
+y <- mu.sample + X%*%beta + rnorm(n, mean = 0, sd =0.5)
+X1 <- cbind(1, X)
+betahat <- (solve(crossprod(X1))%*%crossprod(X1,y))[2,1]
+Xhat <- y-X*betahat
+```
+
+The results given from the mixture models approach are as follows.
+
+```{r}
+#initialization
+initial_tau <- rep(1/K, K)
+initial_mu <- c(-1, 0, 1)
+initial_sigma <- rep(var(Xhat),K)
+#using the function to implement subgroup analysis
+mixmodel_R(Xhat, K, 1e5, initial_tau, initial_mu, initial_sigma)
+library(Rcpp)
+sourceCpp('../src/SA22204174Rcpp.cpp')
+mixmodel_Rcpp(c(Xhat), K, 1e5, initial_tau, initial_mu, initial_sigma)
+```
+
+The results from the concave pairwise fusion approach are as follows.
+
+```{r}
+#parameters to be input in the function
+vartheta <- 1; gamma <- 3; lambda <- 0.05; times <- 1e4
+#using the function to implement subgroup analysis
+result <- concavefusion(X, y, times, vartheta, gamma, lambda)
+#check whether the results accord with the theoretical value
+result$iterations; result$mu[mu.sample==mu[1]]; result$mu[mu.sample==mu[2]]; result$mu[mu.sample==mu[3]]; result$beta
+```
+
+```{r}
+#compare.time <- microbenchmark::microbenchmark(mixmodel_R = mixmodel_R(Xhat, K, 1e5, initial_tau, initial_mu, initial_sigma), mixmodel_Rcpp = mixmodel_Rcpp(c(Xhat), K, 1e5, initial_tau, initial_mu, initial_sigma), concavefusion = concavefusion(X, y, times, vartheta, gamma, lambda))
+#summary(compare.time)[,c(1,3,5,6)]
+```
+
+Because this calculation takes too much time, we skipped it when generating the R package, and the result is shown in the table below.
+
+|expr|lq|median|uq|
+|:-|-:|-:|-:|
+|mixmodel_R|9.79450|11.7156|14.16805|
+|mixmodel_Rcpp|2.09255|2.6182|3.14655|
+|concavefusion|7072.90970|7406.3218|8616.48340|
+
+
+From the time compared above, we find that the mixture model approach is faster than the concave pairwise fusion approach in this case.
+
+But the most important difference between these two approaches is the scope of application rather than the speed of calculation. The mixture model-based approach as a supervised clustering method needs to specify an underlying distribution for the data, such as Gaussian distribution, and also requires specification of the number of mixture components in the population. But the concave pairwise fusion approach is able to automatically detect and identify subgroups based on a concave pairwise fusion penalty without knowledge of an a priori classification or a natural basis for separating a sample into subsets.
+
+
+```{r}
+detach(package:Rcpp)
+rm(list = ls())
+```
+

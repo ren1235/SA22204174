@@ -1,0 +1,24 @@
+Package: SA22204174
+Type: Package
+Title: Two approaches for subgroup analysis
+Version: 1.0
+Date: 2023-11-27
+Author: Jinyi Ren
+Maintainer: Jinyi Ren <jyren2018@mail.ustc.edu.cn>
+Description: In data analysis we sometimes need to correctly identify clusters from a heterogeneous
+             population, which is the problem named subgroup analysis. A popular method for analyzing data
+             from a heterogeneous population is to view data as coming from a mixture of subgroups with
+             their own sets of parameter values and then apply finite mixture model analysis. In this
+             package, two approaches are implemented in three functions. The mixture model approach are
+             implemented in a R function and a Rcpp function, and the concave pairwise fushion approach
+             are implemented in a R function. A detailed description and comparison of the two approaches
+             are also given in a vignette.
+License: GPL (>= 2)
+Imports: Rcpp, microbenchmark, mvtnorm, pander, bootstrap, boot, DAAG, coda, knitr
+Suggests: rmarkdown
+LinkingTo: Rcpp
+RoxygenNote: 7.2.3
+Encoding: UTF-8
+VignetteBuilder: knitr
+URL: http://github.com/ren1235/test1
+BugReports: http://github.com/ren1235/test1/issues
