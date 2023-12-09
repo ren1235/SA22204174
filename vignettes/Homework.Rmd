@@ -1,6 +1,6 @@
 ---
 title: "Homework to SA22204174"
-author: "Jinyiren Ren"
+author: "SA22204174"
 date: "2022-12-13"
 output: rmarkdown::html_vignette
 vignette: >
