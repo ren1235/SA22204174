@@ -20,5 +20,5 @@ LinkingTo: Rcpp
 RoxygenNote: 7.2.3
 Encoding: UTF-8
 VignetteBuilder: knitr
-URL: http://github.com/ren1235/test1
-BugReports: http://github.com/ren1235/test1/issues
+URL: http://github.com/ren1235/SA22204174
+BugReports: http://github.com/ren1235/SA22204174/issues
